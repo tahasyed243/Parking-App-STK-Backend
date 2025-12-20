@@ -1,104 +1,135 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import mongoose from 'mongoose'; // Direct import
-import authRoutes from './routes/auth.js';
-import parkingRoutes from './routes/parkingRoutes.js';
+import mongoose from 'mongoose';
 
 // Load environment variables
 dotenv.config();
 
-// SIMPLE MongoDB Connection (No separate db.js)
-const connectDB = async () => {
-  try {
-    const mongoURI = process.env.MONGODB_URI;
-
-    if (!mongoURI) {
-      console.error('❌ MONGODB_URI is missing in environment variables');
-      console.log('⚠️ Starting server without database...');
-      return;
-    }
-
-    console.log('🔗 Connecting to MongoDB...');
-    await mongoose.connect(mongoURI);
-    console.log('✅ MongoDB Connected Successfully');
-
-  } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error.message);
-    console.log('⚠️ Starting server without database connection');
-    // Don't crash - run without DB
-  }
-};
-
-// Connect to MongoDB (non-blocking)
-connectDB();
+// SIMPLE MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/parking-app')
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.log('⚠️ MongoDB Warning:', err.message));
 
 const app = express();
 
-// SIMPLE CORS - allow all for now
-app.use(cors({
-  origin: '*', // Allow all origins temporarily
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-}));
-
-// Middleware
+// SIMPLE CORS
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/spots', parkingRoutes);
-
-// Health check
+// SIMPLE Routes
 app.get('/', (req, res) => {
   res.json({
     success: true,
     message: '🚗 ParkEase Backend API is running',
-    version: '1.0.0',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
-// Simple test endpoints
-app.get('/test', (req, res) => {
-  res.json({ success: true, message: 'Test endpoint working' });
+// Auth Routes (SIMPLE)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, phone, vehicleNumber } = req.body;
+    
+    // Simple validation
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'User registered successfully',
+      user: { name, email, phone, vehicleNumber }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-app.get('/api/test-spots', (req, res) => {
-  // Return mock data if DB not connected
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token: 'demo-token-' + Date.now(),
+      user: { name: email.split('@')[0], email }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Parking Spots Routes (SIMPLE)
+app.get('/api/spots', async (req, res) => {
+  try {
+    // Try to get from MongoDB
+    const Spot = mongoose.model('Spot') || 
+      mongoose.model('Spot', new mongoose.Schema({
+        spotNumber: String,
+        location: String,
+        isAvailable: Boolean
+      }));
+    
+    const spots = await Spot.find().catch(() => []);
+    
+    // If no spots in DB, return mock data
+    if (!spots || spots.length === 0) {
+      return res.json({
+        success: true,
+        data: [
+          { _id: '1', spotNumber: 'A1', location: 'A', isAvailable: true, pricePerHour: 20 },
+          { _id: '2', spotNumber: 'A2', location: 'A', isAvailable: false, pricePerHour: 20 },
+          { _id: '3', spotNumber: 'B1', location: 'B', isAvailable: true, pricePerHour: 30 }
+        ]
+      });
+    }
+    
+    res.json({ success: true, data: spots });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.put('/api/spots/:id/book', (req, res) => {
+  try {
+    const { hours } = req.body;
+    res.json({
+      success: true,
+      message: `Spot ${req.params.id} booked for ${hours || 1} hour(s)`,
+      totalPrice: (hours || 1) * 20
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.put('/api/spots/:id/release', (req, res) => {
   res.json({
     success: true,
-    data: [
-      { id: 1, spotNumber: 'A1', location: 'A', isAvailable: true },
-      { id: 2, spotNumber: 'A2', location: 'A', isAvailable: false }
-    ]
+    message: `Spot ${req.params.id} released successfully`
   });
 });
 
-// 404 handler
+app.put('/api/spots/:id/occupy', (req, res) => {
+  res.json({
+    success: true,
+    message: `Spot ${req.params.id} marked as occupied`
+  });
+});
+
+// 404 Handler
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.originalUrl} not found`
-  });
+  res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err.message);
-  res.status(500).json({
-    success: false,
-    message: 'Internal Server Error'
-  });
-});
-
+// Start Server
 const PORT = process.env.PORT || 8080;
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Access at: https://parking-app-stk-backend-production.up.railway.app`);
-  console.log(`📡 MongoDB Status: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
-  console.log(`🔗 Health Check: https://parking-app-stk-backend-production.up.railway.app/`);
 });

@@ -1,20 +1,49 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const parkingSpotSchema = new mongoose.Schema({
-  number: { type: Number, required: true },
-  status: {
+  spotNumber: {
     type: String,
-    enum: ["free", "reserved", "occupied"],
-    default: "free",
+    required: [true, 'Spot number is required'],
+    unique: true
   },
-  reservedBy: {
+  location: {
     type: String,
-    default: null,
+    required: [true, 'Location is required'],
+    enum: ['A', 'B', 'C', 'D']
   },
-  reservedUntil: {
+  type: {
+    type: String,
+    required: true,
+    enum: ['standard', 'premium', 'disabled'],
+    default: 'standard'
+  },
+  isAvailable: {
+    type: Boolean,
+    default: true
+  },
+  pricePerHour: {
     type: Number,
-    default: null,
+    required: true,
+    min: 10
   },
+  bookedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  bookedFrom: {
+    type: Date,
+    default: null
+  },
+  bookedUntil: {
+    type: Date,
+    default: null
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-export default mongoose.model("ParkingSpot", parkingSpotSchema);
+const ParkingSpot = mongoose.model('ParkingSpot', parkingSpotSchema);
+export default ParkingSpot;

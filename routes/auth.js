@@ -1,49 +1,130 @@
-import express from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 const router = express.Router();
 
-// Signup
-router.post("/signup", async (req, res) => {
+// @route   POST /api/auth/register
+// @desc    Register user
+// @access  Public
+router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, phone, vehicleNumber } = req.body;
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ error: "User already exists" });
+        // Check if user exists
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists'
+            });
+        }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Create user
+        const user = await User.create({
+            name,
+            email,
+            password,
+            phone,
+            vehicleNumber
+        });
 
-        const newUser = new User({ name, email, password: hashedPassword });
-        await newUser.save();
+        // Generate token
+        const token = jwt.sign(
+            { id: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
 
-        const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-        res.json({ token, user: { id: newUser._id, name, email } });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: "Server error" });
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                vehicleNumber: user.vehicleNumber
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 });
 
-// Login
-router.post("/login", async (req, res) => {
+// @route   POST /api/auth/login
+// @desc    Login user
+// @access  Public
+router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Check if user exists
         const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ error: "Invalid credentials" });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+        // Check password
+        const isPasswordMatch = await user.comparePassword(password);
+        if (!isPasswordMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
 
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        // Generate token
+        const token = jwt.sign(
+            { id: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
 
-        res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: "Server error" });
+        res.json({
+            success: true,
+            message: 'Login successful',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                vehicleNumber: user.vehicleNumber,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// @route   GET /api/auth/me
+// @desc    Get current user
+// @access  Private
+router.get('/me', async (req, res) => {
+    try {
+        // This route requires auth middleware to be added
+        const user = await User.findById(req.user.id).select('-password');
+        res.json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
 });
 

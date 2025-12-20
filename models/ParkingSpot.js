@@ -39,6 +39,11 @@ const parkingSpotSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  status: {
+    type: String,
+    enum: ['free', 'reserved', 'occupied'],
+    default: 'free'
+  },
   createdAt: {
     type: Date,
     default: Date.now

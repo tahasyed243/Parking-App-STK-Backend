@@ -31,7 +31,10 @@ const connectDB = async () => {
 };
 
 // Connect to MongoDB (non-blocking)
-connectDB();
+// connectDB();
+app.get('/simple', (req, res) => {
+  res.json({ working: true });
+});
 
 const app = express();
 

@@ -1,18 +1,51 @@
-import mongoose from "mongoose";
+import express from "express";
+import ParkingSpot from "../models/ParkingSpot.js";
 
-const parkingSpotSchema = new mongoose.Schema({
-  spotNumber: { type: String, required: true, unique: true },
-  status: {
-    type: String,
-    enum: ["free", "reserved", "occupied"],
-    default: "free"
-  },
-  reservedBy: { type: String, default: null },
-  reservedUntil: { type: Date, default: null },
-  occupiedBy: { type: String, default: null },
-  createdAt: { type: Date, default: Date.now }
+const router = express.Router();
+
+// GET all spots
+router.get("/", async (req, res) => {
+  const spots = await ParkingSpot.find();
+  res.json({ success: true, data: spots });
 });
 
-const ParkingSpot = mongoose.model("ParkingSpot", parkingSpotSchema);
+// RESERVE spot
+router.put("/:id/reserve", async (req, res) => {
+  const { name, minutes } = req.body;
 
-export default ParkingSpot;
+  const spot = await ParkingSpot.findById(req.params.id);
+  if (!spot || spot.status !== "free")
+    return res.status(400).json({ message: "Spot not available" });
+
+  spot.status = "reserved";
+  spot.reservedBy = name;
+  spot.reservedUntil = new Date(Date.now() + minutes * 60000);
+
+  await spot.save();
+  res.json(spot);
+});
+
+// OCCUPY spot
+router.put("/:id/occupy", async (req, res) => {
+  const spot = await ParkingSpot.findById(req.params.id);
+  if (!spot || spot.status === "occupied")
+    return res.status(400).json({ message: "Cannot occupy" });
+
+  spot.status = "occupied";
+  await spot.save();
+  res.json(spot);
+});
+
+// FREE spot
+router.put("/:id/free", async (req, res) => {
+  const spot = await ParkingSpot.findById(req.params.id);
+
+  spot.status = "free";
+  spot.reservedBy = null;
+  spot.reservedUntil = null;
+
+  await spot.save();
+  res.json(spot);
+});
+
+export default router;

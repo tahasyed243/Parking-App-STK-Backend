@@ -1,7 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import parkingRoutes from "./routes/parkingRoutes.js";
 
 dotenv.config();
 
@@ -9,37 +9,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/parking';
+// ✅ API routes
+app.use("/api/spots", parkingRoutes);
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => console.log('⚠️ MongoDB Warning:', err.message));
-
-// Health Check
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: '🚗 ParkEase API Running',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
+// Health check
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "🚗 Parking API running" });
 });
 
-// Parking Spots
-app.get('/api/spots', (req, res) => {
-  res.json({
-    success: true,
-    data: [
-      { id: 1, spotNumber: 'A1', available: true },
-      { id: 2, spotNumber: 'A2', available: false }
-    ]
-  });
-});
+const PORT = process.env.PORT || 5000;
 
-// Start Server
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });

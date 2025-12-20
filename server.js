@@ -12,17 +12,17 @@ dotenv.config();
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
-    
+
     if (!mongoURI) {
       console.error('❌ MONGODB_URI is missing in environment variables');
       console.log('⚠️ Starting server without database...');
       return;
     }
-    
+
     console.log('🔗 Connecting to MongoDB...');
     await mongoose.connect(mongoURI);
     console.log('✅ MongoDB Connected Successfully');
-    
+
   } catch (error) {
     console.error('❌ MongoDB Connection Error:', error.message);
     console.log('⚠️ Starting server without database connection');
@@ -31,10 +31,7 @@ const connectDB = async () => {
 };
 
 // Connect to MongoDB (non-blocking)
-// connectDB();
-app.get('/simple', (req, res) => {
-  res.json({ working: true });
-});
+connectDB();
 
 const app = express();
 
